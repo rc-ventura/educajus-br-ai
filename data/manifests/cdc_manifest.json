@@ -1,0 +1,9 @@
+{
+  "source": "Planalto",
+  "law": "Lei 8.078/1990",
+  "file": "data/sources/cdc/cdc-portugues-2013.pdf",
+  "text_file": "data/sources/cdc/cdc_clean.txt",
+  "url": "https://www.planalto.gov.br/ccivil_03/leis/l8078compilado.htm",
+  "download_date": "2025-10-19",
+  "last_updated": "2013-03-15"
+}
