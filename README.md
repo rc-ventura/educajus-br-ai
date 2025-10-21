@@ -12,23 +12,43 @@
 
 ---
 
-## Planned Architecture
+## Architecture
 
-Based on `docs/overview_project_roadmap.md`:
+**See [ARCHITECTURE.md](./ARCHITECTURE.md) for complete multi-agent architecture documentation.**
 
-- **Orchestration:** LangGraph stateful graph with nodes `Triagem → Busca (RAG) → Redator → Auditor → Professor`, supporting retries and conditional routes.
-- **Backend:** Python + FastAPI (thin wrapper exposing `/api/v1/query`).
-- **Prototype UI:** Gradio single-page chat with sources; Next.js frontend deferred to post-MVP.
+### Hybrid Multi-Agent System
+
+EducaJus implements a **hybrid architecture** combining:
+- **Conversational Layer** (`ConversationalAgent`): Handles user interaction, intent classification, and routing
+- **Workflow Layer** (LangGraph Pipeline): Deterministic agent pipeline for educational content generation
+
+```
+User ──▶ ConversationalAgent ──▶ LangGraph Pipeline ──▶ Response
+              │                    │
+              │                    ├─ Triagem (PII + Scope)
+              │                    ├─ Busca (RAG)
+              │                    ├─ Redator (Content)
+              │                    ├─ Auditor (Validation)
+              │                    └─ Professor (Polish)
+              │
+              └─ Direct handling for greetings, clarifications, follow-ups
+```
+
+### Key Components
+
+- **Orchestration:** LangGraph stateful graph with specialized agents
+- **Backend:** Python + FastAPI (thin wrapper exposing `/api/v1/query`)
+- **Prototype UI:** Gradio chat interface (ready for integration)
 - **RAG:** 
   - Embeddings: `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`
-  - Vector DB: FAISS (local MVP) or Qdrant (service)
+  - Vector DB: FAISS (local MVP)
   - Metadata filters by source, article, date
-- **LLM:** OpenAI via SDK or LiteLLM adapter; optionally local Jurema-7B.
-- **Guardrails:** Three layers embedded as graph nodes/validators:
-  - **Layer 1 (Input):** PII/LGPD masking, intent classification, prompt injection blocking
-  - **Layer 2 (Plan/Generation):** Internal reasoning validation, scope checks
-  - **Layer 3 (Output):** Citation validation, tone/bias checks, policy compliance
-- **Optional Infra:** Redis for caching searches and responses.
+- **LLM:** OpenAI SDK (gpt-4o-mini for classification/generation)
+- **Guardrails:** Multi-layer defense:
+  - **Input:** Local PII detection (regex + checksum), scope classification
+  - **Processing:** Citation validation, fact-checking
+  - **Output:** Readability and pedagogical quality checks
+- **Privacy:** All PII detection is local; no sensitive data sent to external APIs
 
 ---
 
@@ -83,21 +103,43 @@ flowchart LR
   - Provenance manifest: `data/manifests/cdc_manifest.json`
 - **RAG Retrieval:**
   - FAISS index + metadata: `data/indexes/cdc_faiss/` (gitignored)
-  - Retrieval helper: `packages/rag/faiss_search.py` with safety checks (alignment validation, k-clamping, bounds checking)
-  - CLI smoke test: `scripts/test_search.py` (adds project root to `sys.path`)
-- **Repository:**
-  - `.gitignore`, `LICENSE`, initial docs, README
+  - Retrieval helper: `packages/rag/faiss_search.py` with safety checks
+  - CLI smoke test: `scripts/test_search.py`
+- **Multi-Agent Architecture:**
+  - **Conversational Layer:** `packages/agents/conversational_agent.py`
+    - Intent classification (greeting, clarification, educational query, follow-up)
+    - Context-aware conversation handling
+    - Pipeline orchestration
+  - **Workflow Agents:** Modular, testable agent files
+    - `triagem_agent.py`: PII detection + scope classification
+    - `busca_agent.py`: RAG retrieval from FAISS
+    - `redator_agent.py`: Educational content generation
+    - `auditor_agent.py`: Citation validation
+    - `professor_agent.py`: Readability enhancement
+  - **Graph Pipeline:** `packages/agents/graph_pipeline.py` (LangGraph orchestration)
+- **Guardrails:**
+  - `InputGuard` (`packages/guardrails/input.py`):
+    - Local PII detection (CPF, CNPJ, email, phone, processo)
+    - Checksum validation for Brazilian tax IDs
+    - Policy-based blocking vs. warnings
+  - `ScopeAgent` (`packages/guardrails/scope.py`):
+    - LLM-based classification with heuristic fallback
+    - CDC vs. other law vs. non-legal detection
+- **Utilities:**
+  - Centralized logging: `packages/utils/logging.py`
+  - Demo script: `examples/conversational_demo.py`
+- **Documentation:**
+  - Complete architecture guide: `ARCHITECTURE.md`
+  - `.gitignore`, `LICENSE`, README
 
-### Missing / Next Steps 🚧
-- **LangGraph Pipeline:** `packages/agents/pipeline.py` with five agent nodes and orchestration logic
-- **Guardrails:** Stubs in `packages/guardrails/` for:
-  - PII detection/masking (CPF, CNPJ, names)
-  - Scope filtering (general vs. specific case)
-  - Citation validation (lookup in metadata)
-  - Tone/readability checks (Flesch PT, neutral language)
-- **FastAPI Backend:** `apps/api/main.py` exposing `/api/v1/query` wired to graph
-- **Gradio UI:** `apps/web/gradio_app.py` consuming the API
-- **Tests:** Initial test scenarios for API and pipeline stubs
+### Next Steps 🚧
+- **FastAPI Backend:** `apps/api/main.py` exposing `/api/v1/query`
+- **Gradio UI:** `apps/web/gradio_app.py` with conversational interface
+- **Enhanced Guardrails:**
+  - `CitationGuard`: Validate legal references against sources
+  - `StyleGuard`: Readability metrics (Flesch PT)
+- **Tests:** Unit tests for each agent and integration tests for pipeline
+- **LLM-Powered Redator:** Replace static templates with dynamic generation
 
 ---
 
@@ -135,6 +177,9 @@ conda activate educa_jus_env
 
 # optional: pip sync
 pip install -r requirements.txt
+
+# Set OpenAI API key (required for LLM features)
+export OPENAI_API_KEY="your-key-here"
 ```
 
 ### Rebuild FAISS Index
@@ -150,9 +195,21 @@ python scripts/test_search.py "práticas abusivas" --k 5
 python scripts/test_search.py "vício do produto" --k 5
 ```
 
+### Run Conversational Agent Demo
+```bash
+python examples/conversational_demo.py
+```
+
+This demonstrates:
+- Greeting handling
+- Educational query processing through the full pipeline
+- PII detection and blocking
+- Out-of-scope query handling
+- Multi-turn conversation with context
+
 ---
 
-## Repository Layout (Planned)
+## Repository Layout
 
 ```
 apps/
@@ -160,15 +217,32 @@ apps/
   web/            # Gradio prototype (pending)
   workers/        # Background jobs (optional)
 data/
-  manifests/      # Source provenance
-  sources/        # Cleaned & chunked legal texts
-  indexes/        # FAISS/Qdrant artifacts (gitignored)
-docs/             # Roadmaps, architecture, guardrails, upgrades
+  manifests/      # Source provenance ✅
+  sources/        # Cleaned & chunked legal texts ✅
+  indexes/        # FAISS artifacts (gitignored) ✅
+docs/             # Roadmaps, architecture, guardrails, upgrades ✅
+examples/         # Demo scripts ✅
+  conversational_demo.py  # Conversational agent demo
 packages/
-  rag/            # RAG components (FAISS search, chunkers, embeddings)
-  agents/         # Agent implementations (Triagem, Busca, Redator, Auditor, Professor)
-  guardrails/     # Security layers (PII, scope, citations, tone)
-scripts/          # ETL, indexing, smoke tests
+  agents/         # Multi-agent system ✅
+    conversational_agent.py  # Hybrid conversational layer
+    triagem_agent.py         # PII + scope validation
+    busca_agent.py           # RAG retrieval
+    redator_agent.py         # Content generation
+    auditor_agent.py         # Citation validation
+    professor_agent.py       # Readability polish
+    graph_pipeline.py        # LangGraph orchestration
+  guardrails/     # Security layers ✅
+    input.py      # PII detection (local, regex + checksum)
+    scope.py      # Scope classification (LLM + heuristic)
+    citation.py   # Citation validation (stub)
+    style.py      # Readability checks (stub)
+  rag/            # RAG components ✅
+    faiss_search.py  # FAISS retrieval with safety checks
+  utils/          # Shared utilities ✅
+    logging.py    # Centralized logging configuration
+scripts/          # ETL, indexing, smoke tests ✅
+ARCHITECTURE.md   # Complete multi-agent architecture guide ✅
 ```
 
 ---

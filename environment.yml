@@ -3,6 +3,10 @@ channels:
   - conda-forge
 dependencies:
   - python=3.10
+  - gradio
+  - openai
+  - langgraph
+  - python-dotenv
   - pip
   - pip:
       - sentence-transformers>=2.7.0

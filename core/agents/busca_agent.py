@@ -1,0 +1,50 @@
+from __future__ import annotations
+from typing import Any, Dict, List, Optional
+from pathlib import Path
+
+from core.rag.faiss_search import FaissSearcher
+
+
+_INDEX_DIR = Path("data/indexes/cdc_faiss")
+_TOP_K_DEFAULT = 5
+
+
+def _get_searcher() -> Optional[FaissSearcher]:
+    """Initialize FAISS searcher if index exists."""
+    if FaissSearcher is None:
+        return None
+    index_file = _INDEX_DIR / "cdc.index"
+    if not index_file.exists():
+        return None
+    try:
+        return FaissSearcher(_INDEX_DIR)
+    except Exception:
+        return None
+
+
+_SEARCHER = _get_searcher()
+
+
+def execute(state: Dict[str, Any]) -> Dict[str, Any]:
+    """Busca agent: RAG retrieval from FAISS index.
+    
+    Short-circuits if triagem blocked the query.
+    """
+    # Short-circuit if triagem blocked
+    if state.get("blocks", {}).get("error"):
+        return state
+
+    k = int(state.get("k") or _TOP_K_DEFAULT)
+    k = max(1, min(k, 10))
+    results: List[Dict[str, Any]] = []
+
+    if _SEARCHER is not None and state.get("cleaned_query"):
+        try:
+            results = _SEARCHER.search(state["cleaned_query"], k=k)
+        except Exception:
+            results = []
+
+    meta = dict(state.get("meta", {}))
+    meta["busca"] = {"k": k, "hits": len(results)}
+    state.update({"sources": results, "meta": meta})
+    return state
