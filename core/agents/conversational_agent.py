@@ -199,6 +199,9 @@ Respond with ONLY the category name, nothing else."""
                 "blocks": {},
                 "sources": [],
                 "meta": {},
+                # # retry control for educational loop
+                # "retry_count": 0,
+                # "max_retries": 1,
             })
             
             # Check if pipeline blocked the query

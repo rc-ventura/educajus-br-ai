@@ -3,6 +3,10 @@ from typing import Any, Dict
 
 from core.guardrails import input as guard_input
 from core.guardrails import scope as guard_scope
+from core.utils.logging import get_logger
+
+
+logger = get_logger(__name__)
 
 
 def execute(state: Dict[str, Any]) -> Dict[str, Any]:
@@ -12,6 +16,7 @@ def execute(state: Dict[str, Any]) -> Dict[str, Any]:
     Records warnings (e.g., processo judicial) in meta.
     """
     q = (state.get("query") or "").strip()
+    logger.info("TriagemAgent: start query='%s'", q[:80])
 
     # 1) PII triage (Option B: block on PII, warn on processo)
     has_pii = False
@@ -30,6 +35,7 @@ def execute(state: Dict[str, Any]) -> Dict[str, Any]:
             }
         except Exception:
             has_pii = False
+            logger.exception("TriagemAgent: Input guard failed")
 
     meta = dict(state.get("meta", {}))
     policy = meta.get("policy", {"pii": "block", "scope": "block"})
@@ -37,6 +43,7 @@ def execute(state: Dict[str, Any]) -> Dict[str, Any]:
     meta["triagem"] = triage_info
 
     if has_pii and policy.get("pii") == "block":
+        logger.info("TriagemAgent: blocking due to PII findings=%s", triage_info.get("blocked"))
         state.update({
             "cleaned_query": q,
             "blocks": {"error": "Falha: sua mensagem contém dado sensível (PII). Remova ou anonimize para continuar."},
@@ -56,10 +63,12 @@ def execute(state: Dict[str, Any]) -> Dict[str, Any]:
         except Exception:
             domain = "cdc"
             scope_meta = {"domain": domain}
+            logger.exception("TriagemAgent: Scope guard failed")
 
     meta["scope"] = scope_meta
 
     if domain == "not_law" and policy.get("scope") == "block":
+        logger.info("TriagemAgent: blocking due to scope domain=%s", domain)
         state.update({
             "cleaned_query": q,
             "blocks": {"error": "Pergunta fora do escopo jurídico. Sou um assistente educacional jurídico."},
@@ -67,6 +76,7 @@ def execute(state: Dict[str, Any]) -> Dict[str, Any]:
         })
         return state
     if domain == "other_law" and policy.get("scope") == "block":
+        logger.info("TriagemAgent: blocking due to scope domain=%s", domain)
         state.update({
             "cleaned_query": q,
             "blocks": {"error": "Sou especializado em Direito do Consumidor (CDC). Estamos expandindo minha inteligência para outras áreas do Direito."},
@@ -75,4 +85,5 @@ def execute(state: Dict[str, Any]) -> Dict[str, Any]:
         return state
 
     state.update({"cleaned_query": q, "meta": meta})
+    logger.info("TriagemAgent: passing to next node domain=%s pii=%s", domain, has_pii)
     return state

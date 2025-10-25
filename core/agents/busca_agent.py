@@ -3,11 +3,13 @@ from typing import Any, Dict, List, Optional
 from pathlib import Path
 
 from core.rag.faiss_search import FaissSearcher
+from core.utils.logging import get_logger
 
 
 _INDEX_DIR = Path("data/indexes/cdc_faiss")
 _TOP_K_DEFAULT = 5
 
+logger = get_logger(__name__)
 
 def _get_searcher() -> Optional[FaissSearcher]:
     """Initialize FAISS searcher if index exists."""
@@ -40,11 +42,14 @@ def execute(state: Dict[str, Any]) -> Dict[str, Any]:
 
     if _SEARCHER is not None and state.get("cleaned_query"):
         try:
-            results = _SEARCHER.search(state["cleaned_query"], k=k)
+            query = state["cleaned_query"]
+            logger.info("BuscaAgent: searching top-%d for query: %s", k, query[:80])
+            results = _SEARCHER.search(query, k=k)
         except Exception:
             results = []
 
     meta = dict(state.get("meta", {}))
     meta["busca"] = {"k": k, "hits": len(results)}
     state.update({"sources": results, "meta": meta})
+    logger.info("BuscaAgent: hits=%d", len(results))
     return state

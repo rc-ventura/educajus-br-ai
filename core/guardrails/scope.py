@@ -35,6 +35,9 @@ class ScopeAgent:
         client = OpenAI(api_key=api_key)
         prompt = (
             "Classify the user message in exactly one of the labels: cdc | other_law | not_law. "
+            "If the message is related to Consumer Law, return cdc."
+            "If the message is related to other law, for example Criminal Law, Labor Law, return other_law."
+            "Else return not_law."
             "Respond only with the label, without explanations.\n\nMessage: " + (text or "")
         )
         resp = client.chat.completions.create(
