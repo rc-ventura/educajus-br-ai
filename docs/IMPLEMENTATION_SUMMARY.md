@@ -8,7 +8,7 @@
 
 **Solution**: Modular agent architecture with separation of concerns
 
-**Result**: 
+**Result**:
 - Clean orchestration layer (45 lines)
 - 5 independent agent modules
 - Easy to test, maintain, and extend
@@ -196,7 +196,7 @@ agent = ConversationalAgent()
 
 def chat(message, history):
     formatted_history = [
-        {"user": h[0], "assistant": h[1]} 
+        {"user": h[0], "assistant": h[1]}
         for h in history
     ]
     result = agent.chat(message, formatted_history)

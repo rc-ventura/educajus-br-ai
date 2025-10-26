@@ -1,5 +1,7 @@
 from __future__ import annotations
 from typing import Any, Dict, List, Optional, TypedDict, Literal
+import time
+from core.utils.logging import get_logger
 
 # LangGraph
 from langgraph.graph import StateGraph, END
@@ -8,7 +10,6 @@ from langgraph.graph import StateGraph, END
 from core.agents import triagem_agent
 from core.agents import busca_agent
 from core.agents import redator_agent
-from core.agents import auditor_agent
 from core.agents import professor_agent
 
 
@@ -44,44 +45,47 @@ def should_continue_after_busca(state: State) -> Literal["BLOCKED", "CONTINUE"]:
     if len(sources) < 2:
         state["blocks"] = {
             "error_insufficient_sources": True,
-            "message": "Não encontrei informações suficientes sobre sua pergunta no CDC."
+            "message": "Não encontrei informações suficientes sobre sua pergunta no CDC.",
         }
         return "BLOCKED"
     return "CONTINUE"
 
 
-def should_continue_after_auditor(state: State) -> Literal["RETRY", "BLOCKED", "CONTINUE"]:
+def should_continue_after_auditor(
+    state: State,
+) -> Literal["RETRY", "BLOCKED", "CONTINUE"]:
     """Check auditor validation and decide retry or continue."""
     meta = state.get("meta", {})
     auditor_meta = meta.get("auditor", {})
-    
+
     # Check if validation passed
     if auditor_meta.get("is_valid", True):
         return "CONTINUE"
-    
+
     # Check retry count
     retry_count = state.get("retry_count", 0)
     max_retries = state.get("max_retries", 1)
-    
+
     if retry_count < max_retries:
         state["retry_count"] = retry_count + 1
         return "RETRY"
-    
+
     # Max retries exceeded - block
     state["blocks"] = {
         "error_validation_failed": True,
         "message": "Não consegui gerar uma resposta com qualidade suficiente. Tente reformular sua pergunta.",
-        "issues": auditor_meta.get("issues", [])
+        "issues": auditor_meta.get("issues", []),
     }
     return "BLOCKED"
 
 
 # Graph definition
+logger = get_logger(__name__)
 _graph = StateGraph(State)
 _graph.add_node("triagem", triagem_agent.execute)
 _graph.add_node("busca", busca_agent.execute)
 _graph.add_node("redator", redator_agent.execute)
-_graph.add_node("auditor", auditor_agent.execute)
+# _graph.add_node("auditor", auditor_agent.execute)
 _graph.add_node("professor", professor_agent.execute)
 
 # Entry point
@@ -89,34 +93,26 @@ _graph.set_entry_point("triagem")
 
 # Conditional edges
 _graph.add_conditional_edges(
-    "triagem",
-    should_continue_after_triagem,
-    {
-        "BLOCKED": END,
-        "CONTINUE": "busca"
-    }
+    "triagem", should_continue_after_triagem, {"BLOCKED": END, "CONTINUE": "busca"}
 )
 
 _graph.add_conditional_edges(
-    "busca",
-    should_continue_after_busca,
-    {
-        "BLOCKED": END,
-        "CONTINUE": "redator"
-    }
+    "busca", should_continue_after_busca, {"BLOCKED": END, "CONTINUE": "redator"}
 )
 
-_graph.add_edge("redator", "auditor")
+# _graph.add_edge("redator", "auditor")
 
-_graph.add_conditional_edges(
-    "auditor",
-    should_continue_after_auditor,
-    {
-        "RETRY": "redator",      # Retry generation
-        "BLOCKED": END,
-        "CONTINUE": "professor"
-    }
-)
+_graph.add_edge("redator", "professor")
+
+# _graph.add_conditional_edges(
+#     "auditor",
+#     should_continue_after_auditor,
+#     {
+#         "RETRY": "redator",      # Retry generation
+#         "BLOCKED": END,
+#         "CONTINUE": "professor"
+#     }
+# )
 
 _graph.add_edge("professor", END)
 
@@ -125,7 +121,7 @@ APP = _graph.compile()
 
 def run(query: str, k: Optional[int] = None, max_retries: int = 1) -> Dict[str, Any]:
     """Convenience wrapper to execute the compiled graph.
-    
+
     Args:
         query: User query
         k: Number of sources to retrieve
@@ -140,11 +136,16 @@ def run(query: str, k: Optional[int] = None, max_retries: int = 1) -> Dict[str, 
         "retry_count": 0,
         "max_retries": max_retries,
     }
-    out: State = APP.invoke(initial)  # type: ignore[assignment]
+    start_ts = time.time()
+    out: State = APP.invoke(initial)
+    total_ms = int((time.time() - start_ts) * 1000)
+    meta = dict(out.get("meta", {}))
+    meta["pipeline"] = {"elapsed_ms": total_ms}
+    logger.info("Pipeline end-to-end elapsed=%dms", total_ms)
     return {
         "query": out.get("query", ""),
         "cleaned_query": out.get("cleaned_query", ""),
         "blocks": out.get("blocks", {}),
         "sources": out.get("sources", []),
-        "meta": out.get("meta", {}),
+        "meta": meta,
     }

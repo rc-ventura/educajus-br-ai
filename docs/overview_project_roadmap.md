@@ -152,15 +152,15 @@ class TriagemAgent:
             r'\d{2}\.\d{3}\.\d{3}/\d{4}-\d{2}',  # CNPJ
             # Add more patterns
         ]
-  
+
     def detect_pii(self, text: str) -> dict:
         """Detect and mask personal information"""
         pass
-  
+
     def classify_intent(self, query: str) -> str:
         """Classify as 'general' or 'specific_case'"""
         pass
-  
+
     def validate_input(self, query: str) -> dict:
         """Run all Layer 1 checks"""
         pass
@@ -192,11 +192,11 @@ class BuscaAgent:
     def __init__(self, vector_db):
         self.vector_db = vector_db
         self.embedder = SentenceTransformer('model-name')
-  
+
     def search(self, query: str, filters: dict = None) -> list:
         """Semantic search with metadata filtering"""
         pass
-  
+
     def rerank_results(self, results: list, query: str) -> list:
         """Rerank by relevance and recency"""
         pass
@@ -227,13 +227,13 @@ class BuscaAgent:
 class RedatorAgent:
     def __init__(self, llm_client):
         self.llm = llm_client  # GPT-4 or Jurema-7B
-  
+
     def generate_response(self, query: str, context: list) -> dict:
         """Generate structured educational response"""
         prompt = self._build_prompt(query, context)
         response = self.llm.generate(prompt)
         return self._parse_response(response)
-  
+
     def _build_prompt(self, query, context):
         """Structured prompt with RAG context"""
         pass
@@ -289,11 +289,11 @@ RESPOSTA:
 class AuditorAgent:
     def __init__(self, source_validator):
         self.validator = source_validator
-  
+
     def validate_citations(self, response: dict) -> bool:
         """Cross-check all legal references"""
         pass
-  
+
     def check_compliance(self, response: dict) -> dict:
         """Run policy compliance checks"""
         checks = {
@@ -357,31 +357,31 @@ class AgentOrchestrator:
         self.redator = RedatorAgent(llm)
         self.auditor = AuditorAgent(validator)
         self.professor = ProfessorAgent()
-  
+
     async def process_query(self, user_query: str) -> dict:
         # Layer 1: Input Guardrails
         triagem_result = self.triagem.validate_input(user_query)
         if not triagem_result['is_valid']:
             return triagem_result['redirect_message']
-      
+
         # Retrieval
         context = self.busca.search(triagem_result['cleaned_query'])
-      
+
         # Layer 2: Generation with Planning
         response = self.redator.generate_response(
-            triagem_result['cleaned_query'], 
+            triagem_result['cleaned_query'],
             context
         )
-      
+
         # Layer 3: Output Validation
         audit_result = self.auditor.check_compliance(response)
         if not audit_result['passed']:
             # Retry or send to HITL
             return self._handle_audit_failure(audit_result)
-      
+
         # Enrichment
         final_response = self.professor.enrich_response(response)
-      
+
         return final_response
 ```
 
@@ -518,15 +518,15 @@ async def generate_document(request: DocumentRequest) -> dict:
 class HITLQueue:
     def __init__(self, redis_client):
         self.queue = redis_client
-  
+
     def add_to_queue(self, query: str, response: dict, reason: str):
         """Add response to human review queue"""
         pass
-  
+
     def get_pending(self) -> list:
         """Get pending reviews"""
         pass
-  
+
     def approve(self, review_id: str, reviewer_notes: str):
         """Approve and release response"""
         pass

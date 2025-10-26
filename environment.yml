@@ -4,9 +4,11 @@ channels:
 dependencies:
   - python=3.10
   - gradio
+  - litellm
   - openai
   - langgraph
   - python-dotenv
+  - pre-commit
   - pip
   - pip:
       - sentence-transformers>=2.7.0

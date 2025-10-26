@@ -33,3 +33,6 @@ cache/
 
 # Generated indexes
 data/indexes/
+
+# Gradio
+.gradio

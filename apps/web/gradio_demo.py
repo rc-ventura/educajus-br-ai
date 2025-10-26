@@ -7,7 +7,7 @@ import gradio as gr
 from dotenv import load_dotenv
 
 # Load env variables
-load_dotenv() 
+load_dotenv()
 
 # Ensure project root on sys.path for absolute imports like `core.*`
 project_root = Path(__file__).resolve().parents[2]
@@ -26,57 +26,80 @@ agent = ConversationalAgent(model="gpt-4o-mini")
 
 def chat_with_agent(message: str, history: list) -> str:
     """Process user message through ConversationalAgent.
-    
+
     Args:
         message: User input
         history: Gradio chat history [[user_msg, bot_msg], ...]
-    
+
     Returns:
         Bot response string
     """
     # Convert Gradio history to ConversationalAgent format
     formatted_history = []
     for user_msg, bot_msg in history:
-        formatted_history.append({
-            "user": user_msg,
-            "assistant": bot_msg
-        })
-    
+        formatted_history.append({"user": user_msg, "assistant": bot_msg})
+
     try:
         # Call agent
         result = agent.chat(message, formatted_history)
-        
+
         # Extract response
-        response = result.get("response", "Desculpe, não consegui processar sua mensagem.")
+        response = result.get(
+            "response", "Desculpe, não consegui processar sua mensagem."
+        )
         response_type = result.get("type", "unknown")
-        
+
         # Add metadata for debugging
         if response_type == "blocked":
             meta = result.get("reason", {})
             triagem = meta.get("triagem", {})
-            
+
             # Show which guardrail triggered
             if triagem.get("has_pii"):
                 response += "\n\n🛡️ **Guardrail ativado:** PII Detection"
                 findings = triagem.get("blocked", [])
                 if findings:
                     response += f"\n📋 Dados detectados: {', '.join([f['type'] for f in findings])}"
-            
+
             scope = meta.get("scope", {})
             if scope.get("domain") in ["not_law", "other_law"]:
                 response += "\n\n🛡️ **Guardrail ativado:** Scope Classification"
                 response += f"\n📋 Domínio detectado: {scope.get('domain')}"
-        
+
+            feedback = triagem.get("llm_feedback")
+            if feedback:
+                response += f"\n\n📝 **Nota da triagem:** {feedback}"
+
         elif response_type == "educational":
             # Show pipeline metadata
             meta = result.get("meta", {})
             busca = meta.get("busca", {})
             if busca:
                 response += f"\n\n📚 **Fontes encontradas:** {busca.get('hits', 0)}"
-        
+
+            # Timings
+            pipeline = meta.get("pipeline", {}) or {}
+            redator = meta.get("redator", {}) or {}
+            professor = meta.get("professor", {}) or {}
+            if pipeline or redator or professor:
+                response += "\n\n⏱️ **Tempos (ms):**"
+                if pipeline.get("elapsed_ms") is not None:
+                    response += f"\n- Pipeline (E2E): {pipeline.get('elapsed_ms')}"
+                if busca.get("elapsed_ms") is not None:
+                    response += f"\n- Busca: {busca.get('elapsed_ms')}"
+                if redator.get("elapsed_ms") is not None:
+                    response += f"\n- Redator: {redator.get('elapsed_ms')}"
+                if professor.get("elapsed_ms") is not None:
+                    response += f"\n- Professor: {professor.get('elapsed_ms')}"
+
+            triagem = meta.get("triagem", {})
+            feedback = triagem.get("llm_feedback")
+            if feedback:
+                response += f"\n\n📝 **Nota da triagem:** {feedback}"
+
         logger.info(f"Response type: {response_type}")
         return response
-        
+
     except Exception as e:
         logger.error(f"Error in chat: {e}")
         return f"❌ Erro: {str(e)}\n\nVerifique se OPENAI_API_KEY está configurada."
@@ -88,7 +111,7 @@ demo = gr.ChatInterface(
     title="🏛️ EducaJus - Assistente CDC (Demo)",
     description="""
     **Teste os guardrails de segurança:**
-    
+
     ✅ **Cenários de teste:**
     - 🛡️ PII: "Meu CPF é 123.456.789-09, o que faço?"
     - 🛡️ Escopo: "Quais são meus direitos trabalhistas?"
@@ -116,7 +139,7 @@ if __name__ == "__main__":
         print("⚠️  OPENAI_API_KEY não encontrada!")
         print("Configure com: export OPENAI_API_KEY='sua-chave'")
         sys.exit(1)
-    
+
     print("🚀 Iniciando EducaJus Gradio Demo...")
     print("📍 Acesse: http://localhost:7860")
     print("\n🧪 Cenários de teste:")
@@ -124,7 +147,7 @@ if __name__ == "__main__":
     print("  2. Escopo: 'Quais são meus direitos trabalhistas?'")
     print("  3. CDC: 'Direito de arrependimento em compras online'")
     print("\n⏹️  Pressione Ctrl+C para parar\n")
-    
+
     demo.launch(
         server_name="0.0.0.0",
         server_port=7860,

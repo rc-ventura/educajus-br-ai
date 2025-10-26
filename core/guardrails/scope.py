@@ -19,7 +19,6 @@ class ScopeAnalysis(TypedDict, total=False):
     confidence: Optional[float]
 
 
-
 class ScopeAgent:
     """Agent for scope analysis (legal vs non-legal; CDC vs other law).
 
@@ -27,7 +26,7 @@ class ScopeAgent:
     - classify_with_llm(): OpenAI SDK label + reason.
     """
 
-    def classify_with_llm(self, text: str) -> tuple[Domain, str]:  
+    def classify_with_llm(self, text: str) -> tuple[Domain, str]:
         api_key = os.getenv("OPENAI_API_KEY", "")
         if not api_key:
             raise RuntimeError("OPENAI_API_KEY not set")
@@ -38,7 +37,8 @@ class ScopeAgent:
             "If the message is related to Consumer Law, return cdc."
             "If the message is related to other law, for example Criminal Law, Labor Law, return other_law."
             "Else return not_law."
-            "Respond only with the label, without explanations.\n\nMessage: " + (text or "")
+            "Respond only with the label, without explanations.\n\nMessage: "
+            + (text or "")
         )
         resp = client.chat.completions.create(
             model="gpt-4o-mini",
@@ -70,19 +70,19 @@ class ScopeAgent:
             source = "llm"
             confidence: Optional[float] = None
         except Exception:
-            #TODO: implementar heurística
+            # TODO: implementar heurística
 
             domain = "not_law"
             reason = "Heurística: nenhum indicativo jurídico encontrado."
             source = "heuristic"
             confidence = None
-        
+
         is_legal = domain in {"cdc", "other_law"}
         is_consumer = domain == "cdc"
 
         elapsed = time.time() - start_time
         logger.info(f"Scope analysis: {domain} ({elapsed:.2f}s)")
-        
+
         return {
             "is_legal": is_legal,
             "is_consumer": is_consumer,

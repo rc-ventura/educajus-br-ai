@@ -1,6 +1,6 @@
 from __future__ import annotations
 import re
-from typing import Dict, Iterable, List, Literal, Optional, Tuple
+from typing import Dict, List, Literal, Tuple
 import time
 
 from core.utils.logging import get_logger
@@ -8,7 +8,9 @@ from core.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
-PIIType = Literal["cpf", "cnpj", "email", "phone", "numeric_11", "numeric_14", "processo"]
+PIIType = Literal[
+    "cpf", "cnpj", "email", "phone", "numeric_11", "numeric_14", "processo"
+]
 
 
 class InputGuard:
@@ -59,14 +61,14 @@ class InputGuard:
         # First digit
         weights = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
         s = sum(int(digits[i]) * weights[i] for i in range(12))
-        d1 = (s % 11)
+        d1 = s % 11
         d1 = 0 if d1 < 2 else 11 - d1
         if d1 != int(digits[12]):
             return False
         # Second digit
         weights = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
         s = sum(int(digits[i]) * weights[i] for i in range(13))
-        d2 = (s % 11)
+        d2 = s % 11
         d2 = 0 if d2 < 2 else 11 - d2
         return d2 == int(digits[13])
 
@@ -87,12 +89,16 @@ class InputGuard:
                 elif label == "numeric_14":
                     valid = self._validate_cnpj(value)
                 if valid:
-                    findings.append({
-                        "type": label,
-                        "value": value,
-                        "span": (m.start(), m.end()),
-                        "severity": "block" if label in self.block_types else "warn",
-                    })
+                    findings.append(
+                        {
+                            "type": label,
+                            "value": value,
+                            "span": (m.start(), m.end()),
+                            "severity": (
+                                "block" if label in self.block_types else "warn"
+                            ),
+                        }
+                    )
         return findings
 
     def detect_pii(self, text: str) -> bool:
@@ -108,9 +114,9 @@ class InputGuard:
 
     def analyze(self, text: str) -> Dict[str, object]:
         """Analyze text for PII and process warnings."""
-       
+
         start_time = time.time()
-        
+
         findings = self.find_pii(text)
         blocked = [f for f in findings if f.get("severity") == "block"]
         warnings = [f for f in findings if f.get("severity") == "warn"]
@@ -122,7 +128,7 @@ class InputGuard:
             "warnings": warnings,
             "masked_text": self.mask_pii(text) if blocked else text,
         }
-        
+
         elapsed = time.time() - start_time
         logger.info(
             "InputGuard analyze: blocked=%d warnings=%d elapsed=%fs",
@@ -130,5 +136,5 @@ class InputGuard:
             len(warnings),
             elapsed,
         )
-        
+
         return result

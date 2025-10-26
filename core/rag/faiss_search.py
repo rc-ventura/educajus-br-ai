@@ -57,6 +57,7 @@ class FaissSearcher:
                         "artigo": m.get("artigo"),
                         "lei": m.get("lei"),
                         "url": m.get("url"),
+                        "texto": m.get("texto", ""),
                     }
                 )
             else:

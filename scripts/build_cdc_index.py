@@ -14,10 +14,12 @@ from pathlib import Path
 import numpy as np
 
 try:
-    import faiss  # type: ignore
-    from sentence_transformers import SentenceTransformer  # type: ignore
-except Exception as e:
-    print("Missing dependencies. Install with: pip install sentence-transformers faiss-cpu")
+    import faiss
+    from sentence_transformers import SentenceTransformer
+except Exception:
+    print(
+        "Missing dependencies. Install with: pip install sentence-transformers faiss-cpu"
+    )
     raise
 
 MODEL_NAME = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
@@ -29,16 +31,22 @@ def load_chunks(jsonl_path: Path) -> tuple[list[str], list[dict]]:
         for line in f:
             rec = json.loads(line)
             texts.append(rec["texto"])
-            meta.append({k: rec[k] for k in ("id", "artigo", "lei", "url")})
+            meta.append(
+                {k: rec.get(k) for k in ("id", "artigo", "lei", "url", "texto")}
+            )
     return texts, meta
 
 
-def build_index(chunks_jsonl: Path, out_dir: Path, model_name: str = MODEL_NAME) -> None:
+def build_index(
+    chunks_jsonl: Path, out_dir: Path, model_name: str = MODEL_NAME
+) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     texts, meta = load_chunks(chunks_jsonl)
 
     model = SentenceTransformer(model_name)
-    emb = model.encode(texts, convert_to_numpy=True, show_progress_bar=True, normalize_embeddings=True)
+    emb = model.encode(
+        texts, convert_to_numpy=True, show_progress_bar=True, normalize_embeddings=True
+    )
     emb = emb.astype(np.float32)
 
     index = faiss.IndexFlatIP(emb.shape[1])

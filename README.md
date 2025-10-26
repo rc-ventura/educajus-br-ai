@@ -39,7 +39,7 @@ User ──▶ ConversationalAgent ──▶ LangGraph Pipeline ──▶ Respon
 - **Orchestration:** LangGraph stateful graph with specialized agents
 - **Backend:** Python + FastAPI (thin wrapper exposing `/api/v1/query`)
 - **Prototype UI:** Gradio chat interface (ready for integration)
-- **RAG:** 
+- **RAG:**
   - Embeddings: `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`
   - Vector DB: FAISS (local MVP)
   - Metadata filters by source, article, date

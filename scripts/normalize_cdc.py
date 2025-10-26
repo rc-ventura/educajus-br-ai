@@ -13,12 +13,14 @@ import sys
 import re
 from pathlib import Path
 
+
 def normalize_text_file(path: Path) -> None:
     text = path.read_text(encoding="utf-8", errors="ignore")
     text = text.replace("\f", "\n")
     text = re.sub(r"(?m)^\s*\d+\s*$", "", text)  # page numbers-only lines
-    text = re.sub(r"\n{3,}", "\n\n", text)        # collapse extra blank lines
+    text = re.sub(r"\n{3,}", "\n\n", text)  # collapse extra blank lines
     path.write_text(text.strip() + "\n", encoding="utf-8")
+
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:

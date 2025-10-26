@@ -96,7 +96,7 @@ Deterministic agents orchestrated via LangGraph in a fixed pipeline.
 - `InputGuard`: Local regex-based PII detection (no external API calls)
 - `ScopeAgent`: LLM classification (gpt-4o-mini) with keyword fallback
 
-**Output**: 
+**Output**:
 - `meta.triagem`: PII findings, warnings, blocked items
 - `meta.scope`: Domain classification, confidence, reasoning
 - `blocks.error`: If query is blocked
@@ -547,10 +547,10 @@ agent = ConversationalAgent()
 def chat_interface(message, history):
     # Convert Gradio history format
     formatted_history = [
-        {"user": h[0], "assistant": h[1]} 
+        {"user": h[0], "assistant": h[1]}
         for h in history
     ]
-    
+
     result = agent.chat(message, formatted_history)
     return result["response"]
 
